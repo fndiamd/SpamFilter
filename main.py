@@ -1,39 +1,48 @@
-import os
 import numpy as np
 import pandas as pd
+import os
+import nltk
+import nltk.corpus
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 import email
-from keras.models import Sequential
-from keras.models import model_from_json
-from keras.layers import Dense
-from keras.preprocessing.sequence import pad_sequences
-from keras.preprocessing.text import Tokenizer
-import keras_metrics
+import email.policy
+from bs4 import BeautifulSoup
+import re
+import pickle
 
-tokenizer = Tokenizer()
+nltk.download('punkt')
+nltk.download('stopwords')
 
-# load json and create model
-json_file = open('model/lstm_model.json', 'r')
-loaded_model_json = json_file.read()
-json_file.close()
-loaded_model = model_from_json(loaded_model_json)
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import roc_auc_score
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import GridSearchCV
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import precision_score, recall_score, accuracy_score
 
-loaded_model.load_weights('model/lstm_model.h5')
-print('Loaded model from disk')
+def input_preprocessing(email):
+    email = re.sub(r"[^a-zA-Z0-9]+", ' ', email)
+    stopList = set(stopwords.words('english'))
+    emailToken = word_tokenize(email.lower())
+    email = [word for word in emailToken if word not in stopList]
+    email = ' '.join([str(elem) for elem in email])
+    return email
 
-def get_predictions(text):
-  sequence = tokenizer.texts_to_sequences([text])
-  # pad the sequence
-  sequence = pad_sequences(sequence, maxlen=100)
-  # get the prediction
-  prediction = loaded_model.predict(sequence)[0]
-  # one-hot encoded vector, revert using np.argmax
-  if np.argmax(prediction) == 0:
-    print('The email has not been flagged as SPAM.')
-  else:
-    print('The email has been flagged as SPAM.')
+model = pickle.load(open('model/email-spam-detection-model.sav', 'rb'))
+vect =  pickle.load(open("model/vectorized.pickel", "rb"))
 
-text = "This is just to let you all know we have scheduled a meet"
-get_predictions(text)
+email = ["My Dear Good Friend. May i use this medium to open a mutual communication with you seeking your acceptance towards  investing in your country under your management as my partner, My name is Aisha  Gaddafi and  presently living in Oman, i am a Widow and single Mother with three Children, the only biological  Daughter of late Libyan President (Late Colonel Muammar Gaddafi) and presently i am under political  asylum protection by the Omani Government. Please Reply me in my box. (aishagaddafi7710@gmail.com). I have funds worth Twenty Seven Million Five Hundred Thousand United State Dollars,$27.500.000.00 US Dollars which i want to entrust to you for investment projects in your country. If you are willing to handle this project on my behalf, kindly reply urgent to enable me provide you more  details to start the transfer process, I shall appreciate your urgent response through my email address. Below : (aishagaddafi7710@gmail.com). Best Regards. Mrs Aisha."]
+email[0] = input_preprocessing(email[0])
+email
 
-text = "Congratulations! You've won a $1,000 Walmart gift card. Go to http://www.walmart.xyz/claim-reward-1000-dollars to claim now!"
-get_predictions(text)
+email = vect.transform(email)
+prediction = model.predict(email)
+prediction
+
+if prediction == 0:
+    print("Email is not spam.")
+else:
+    print("Email is spam.")
