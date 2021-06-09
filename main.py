@@ -1,27 +1,15 @@
-import numpy as np
-import pandas as pd
-import os
 import nltk
 import nltk.corpus
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import email
 import email.policy
-from bs4 import BeautifulSoup
 import re
 import pickle
 
 nltk.download('punkt')
 nltk.download('stopwords')
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import roc_auc_score
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import StratifiedShuffleSplit
-from sklearn.model_selection import GridSearchCV
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.metrics import precision_score, recall_score, accuracy_score
 
 def input_preprocessing(email):
     email = re.sub(r"[^a-zA-Z0-9]+", ' ', email)
