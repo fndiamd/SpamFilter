@@ -4,8 +4,12 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 import email
 import email.policy
+from email.parser import Parser
+from email.utils import parseaddr, formataddr
 import re
 import pickle
+import sys
+import subprocess
 
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -22,15 +26,60 @@ def input_preprocessing(email):
 model = pickle.load(open('model/email-spam-detection-model.sav', 'rb'))
 vect =  pickle.load(open("model/vectorized.pickel", "rb"))
 
-email = ["My Dear Good Friend. May i use this medium to open a mutual communication with you seeking your acceptance towards  investing in your country under your management as my partner, My name is Aisha  Gaddafi and  presently living in Oman, i am a Widow and single Mother with three Children, the only biological  Daughter of late Libyan President (Late Colonel Muammar Gaddafi) and presently i am under political  asylum protection by the Omani Government. Please Reply me in my box. (aishagaddafi7710@gmail.com). I have funds worth Twenty Seven Million Five Hundred Thousand United State Dollars,$27.500.000.00 US Dollars which i want to entrust to you for investment projects in your country. If you are willing to handle this project on my behalf, kindly reply urgent to enable me provide you more  details to start the transfer process, I shall appreciate your urgent response through my email address. Below : (aishagaddafi7710@gmail.com). Best Regards. Mrs Aisha."]
-email[0] = input_preprocessing(email[0])
-email
+BRANDING_HEADER = 'X-SPAM-CHECK'
 
-email = vect.transform(email)
-prediction = model.predict(email)
-prediction
+def apply_filter(frm, to, content):
+    content = vect.transform(content)
+    prediction = model.predict(content)
+    if prediction == 1:
+        oldSubject = content.get('Subject')
+        del content['Subject']
+        content['Subject'] = "!!! SPAM !!!" + oldSubject
+    return frm, to, content
 
-if prediction == 0:
-    print("Email is not spam.")
-else:
-    print("Email is spam.")
+EX_TEMPFAIL = 75
+EX_UNAVAILABLE = 69
+
+def parse_args():
+    try:
+        cli_from = sys.argv[1].lower()
+        cli_to = [x.lower() for x in sys.argv[2:]]
+    except IndexError:
+        sys.exit(EX_UNAVAILABLE)
+    else:
+        return cli_from, cli_to
+
+def get_content():
+    content = ''.join(sys.stdin.readlines())
+    return Parser().parsestr(content)
+
+def re_inject(frm, to, content):
+    if BRANDING_HEADER in content:
+        return True
+
+    content[BRANDING_HEADER] = 'yes'
+
+    p = subprocess.Popen(
+        ['/usr/sbin/sendmail', '-G', '-i', '-f', frm] + to,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    p.communicate(content.as_bytes())
+    ret = p.wait()
+
+    if ret == 0:
+        return True
+
+    return False
+
+def main():
+    frm, to = parse_args()
+    content = get_content()
+
+    if not re_inject(*apply_filter(frm, to, content)):
+        sys.exit(EX_TEMPFAIL)
+
+if __name__ == '__main__':
+    main()
